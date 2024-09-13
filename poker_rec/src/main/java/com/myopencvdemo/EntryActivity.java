@@ -7,11 +7,11 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.View;
 import android.widget.TextView;
-import cn.pedant.SweetAlert.SweetAlertDialog;
+
 import com.myopencvdemo.datapool.DataPool;
 import com.myopencvdemo.domain.MlData;
+
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
@@ -23,6 +23,8 @@ import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import cn.pedant.SweetAlert.SweetAlertDialog;
 
 /**
  * 入口Activity
@@ -42,15 +44,10 @@ public class EntryActivity extends AppCompatActivity {
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
-            switch (status) {
-                case LoaderCallbackInterface.SUCCESS: {
-                    Log.i(App.tag, "OpenCV loaded successfully");
-                }
-                break;
-                default: {
-                    super.onManagerConnected(status);
-                }
-                break;
+            if (status == LoaderCallbackInterface.SUCCESS) {
+                Log.i(App.tag, "OpenCV loaded successfully");
+            } else {
+                super.onManagerConnected(status);
             }
         }
     };
@@ -81,20 +78,9 @@ public class EntryActivity extends AppCompatActivity {
         setContentView(R.layout.main);
 
         textViewStatus = findViewById(R.id.textViewStatus);
-        findViewById(R.id.buttonPreview).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startNewActivity(PokerRecJiaoXueActivity.class);
-            }
-        });
+        findViewById(R.id.buttonPreview).setOnClickListener(v -> startActivity(new Intent(this, PokerRecJiaoXueActivity.class)));
 
-        findViewById(R.id.createMlData).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new MlThread(mldataPath).start();
-
-            }
-        });
+        findViewById(R.id.createMlData).setOnClickListener(v -> new MlThread(mldataPath).start());
 
         if (!OpenCVLoader.initDebug()) {
             Log.d(App.tag, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
@@ -116,37 +102,24 @@ public class EntryActivity extends AppCompatActivity {
 
         @Override
         public void run() {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    textViewStatus.setText("稍后");
-                    showProgressBar();
-                }
+            runOnUiThread(() -> {
+                textViewStatus.setText("稍后");
+                showProgressBar();
             });
 
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    textViewStatus.setText("拷贝样本数据到sdcard");
-                }
-            });
+            runOnUiThread(() -> textViewStatus.setText("拷贝样本数据到sdcard"));
 
             //拷贝数据
-            File zipFile=new File("/sdcard/good_data.zip");
-            if(!zipFile.exists()){
+            File zipFile = new File("/sdcard/good_data.zip");
+            if (!zipFile.exists()) {
                 copyAssets(EntryActivity.this, "good_data.zip", "/sdcard/good_data.zip");
             }
 
             //解压缩
-            File mldataPathFile=new File(mldataPath);
-            if(!mldataPathFile.exists()){
-                unZip(zipFile,Environment.getExternalStorageDirectory() + File.separator);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        textViewStatus.setText("解压完成");
-                    }
-                });
+            File mldataPathFile = new File(mldataPath);
+            if (!mldataPathFile.exists()) {
+                unZip(zipFile, Environment.getExternalStorageDirectory() + File.separator);
+                runOnUiThread(() -> textViewStatus.setText("解压完成"));
             }
 
             //初始化机器学习数据
@@ -158,42 +131,31 @@ public class EntryActivity extends AppCompatActivity {
                     continue;
                 }
                 MlData mlData = MlData.createMlDataFromDirectory(t);
-                if (null == mlData) {
-                    Log.i(App.tag, "ret:" + mlData.toString());
-                    continue;
-                }
                 DataPool.addMlData(mlData.getLabel(), mlData);
             }
-
             DataPool.init();
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    hideProgressBar();
-                    textViewStatus.setText("结束");
-                    Intent intent = new Intent(EntryActivity.this, PokerRecActivity.class);
-                    startActivity(intent);
-                }
+            runOnUiThread(() -> {
+                hideProgressBar();
+                textViewStatus.setText("结束");
+                Intent intent = new Intent(EntryActivity.this, PokerRecActivity.class);
+                startActivity(intent);
             });
 
         }
     }
 
-
-    private void startNewActivity(Class claz) {
-        Intent intent = new Intent(this, claz);
-        startActivity(intent);
-    }
-
-
     /**
      * 复制asset文件到指定目录
+     *
      * @param oldPath asset下的路径
      * @param newPath SD卡下保存路径
      */
     public static void copyAssets(Context context, String oldPath, String newPath) {
         try {
-            String fileNames[] = context.getAssets().list(oldPath);// 获取assets目录下的所有文件及目录名
+            String[] fileNames = context.getAssets().list(oldPath);// 获取assets目录下的所有文件及目录名
+            if (fileNames == null) {
+                return;
+            }
             if (fileNames.length > 0) {// 如果是目录
                 File file = new File(newPath);
                 file.mkdirs();// 如果文件夹不存在，则递归
@@ -202,9 +164,9 @@ public class EntryActivity extends AppCompatActivity {
                 }
             } else {// 如果是文件
                 InputStream is = context.getAssets().open(oldPath);
-                FileOutputStream fos = new FileOutputStream(new File(newPath));
+                FileOutputStream fos = new FileOutputStream(newPath);
                 byte[] buffer = new byte[1024];
-                int byteCount = 0;
+                int byteCount;
                 while ((byteCount = is.read(buffer)) != -1) {// 循环从输入流读取
                     // buffer字节
                     fos.write(buffer, 0, byteCount);// 将读取的输入流写入到输出流
@@ -214,7 +176,6 @@ public class EntryActivity extends AppCompatActivity {
                 fos.close();
             }
         } catch (Exception e) {
-            e.printStackTrace();
             Log.e(App.tag, "拷贝出错：" + e.getLocalizedMessage());
         }
     }
@@ -231,22 +192,19 @@ public class EntryActivity extends AppCompatActivity {
         ZipFile zipFile = null;
 
         try {
-
             zipFile = new ZipFile(srcFile);
             Enumeration<?> entries = zipFile.entries();
             while (entries.hasMoreElements()) {
-
                 ZipEntry entry = (ZipEntry) entries.nextElement();
-                System.out.println("解压" + entry.getName());
                 if (entry.isDirectory()) {
-                    String dirPath = destDirPath + "/" + entry.getName();
+                    String dirPath = destDirPath + File.separator + entry.getName();
                     File dir = new File(dirPath);
                     dir.mkdirs();
                 } else {
                     // 如果是文件，就先创建一个文件，然后用io流把内容copy过去
-                    File targetFile = new File(destDirPath + "/" + entry.getName());
+                    File targetFile = new File(destDirPath + File.separator + entry.getName());
                     // 保证这个文件的父文件夹必须要存在
-                    if(!targetFile.getParentFile().exists()){
+                    if (!targetFile.getParentFile().exists()) {
                         targetFile.getParentFile().mkdirs();
                     }
                     targetFile.createNewFile();
@@ -264,17 +222,16 @@ public class EntryActivity extends AppCompatActivity {
                 }
             }
             long end = System.currentTimeMillis();
-            System.out.println("解压完成，耗时：" + (end - start) +" ms");
+            System.out.println("解压完成，耗时：" + (end - start) + " ms");
         } catch (Exception e) {
             throw new RuntimeException("unzip error from ZipUtils", e);
         } finally {
-            if(zipFile != null){
+            if (zipFile != null) {
                 try {
                     zipFile.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
             }
 
         }

@@ -34,117 +34,71 @@ public class PokerRecActivity extends Activity implements CameraBridgeViewBase.C
     private CheckBox checkBoxCaerma;
     private CheckBox checkBoxStudy;
     private View viewContent;
-
     private ArrayList<String> cardTypes = new ArrayList<>();
-
-
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
-            switch (status) {
-                case LoaderCallbackInterface.SUCCESS: {
-                    Log.i(TAG, "OpenCV loaded successfully");
-                    mOpenCvCameraView.enableView();
-                }
-                break;
-                default: {
-                    super.onManagerConnected(status);
-                }
-                break;
+            if (status == LoaderCallbackInterface.SUCCESS) {
+                Log.i(TAG, "OpenCV loaded successfully");
+                mOpenCvCameraView.enableView();
+            } else {
+                super.onManagerConnected(status);
             }
         }
     };
-
-    public PokerRecActivity() {
-        Log.i(TAG, "Instantiated new " + this.getClass());
-    }
-
-
     int screen_width;
     int screen_height;
-
-
     ArrayList<Rect> rects;
-
     Bitmap bitmap = null;
-
     ImageView imageViewRightTarget;
-
     private boolean needRec = true;
     private int huseCount = 13;//13 poker card 花色的总数，代表这么多张卡片
-
     private TextView textViewResult;
-
-
     private float cropContentPercent = 1;
     private float coverContentPercennt = 1;
 
-
-    /**
-     * Called when the activity is first created.
-     */
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.camera_preview_layout);
 
         imageViewRightTarget = findViewById(R.id.imageViewRightTarget);
         viewContent = findViewById(R.id.viewContent);
-        viewContent.post(new Runnable() {
-            @Override
-            public void run() {
-                cropContentPercent = (((LinearLayout.LayoutParams) viewContent.getLayoutParams()).weight);
-                coverContentPercennt = (((LinearLayout.LayoutParams) findViewById(R.id.converView).getLayoutParams()).weight);
-                Log.e(App.tag, "weight is :" + cropContentPercent + " cover:" + coverContentPercennt * 2);
-
-            }
+        viewContent.post(() -> {
+            cropContentPercent = (((LinearLayout.LayoutParams) viewContent.getLayoutParams()).weight);
+            coverContentPercennt = (((LinearLayout.LayoutParams) findViewById(R.id.converView).getLayoutParams()).weight);
+            Log.d(App.tag, "weight is :" + cropContentPercent + " cover:" + coverContentPercennt * 2);
         });
-
-
         textViewResult = findViewById(R.id.textViewResult);
-        textViewResult.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                needRec = true;
-                textViewResult.setText("等待重新识别:");
-            }
+        textViewResult.setOnClickListener(v -> {
+            needRec = true;
+            textViewResult.setText("等待重新识别:");
         });
 
         rects = new ArrayList<>();
-
         checkBoxStudy = findViewById(R.id.checkBoxStudy);
-
         Resources resources = this.getResources();
         DisplayMetrics dm = resources.getDisplayMetrics();
-        float density = dm.density;
         screen_width = dm.widthPixels;
         screen_height = dm.heightPixels;
 
-
         seekBar = findViewById(R.id.seekBar);
         checkBoxCaerma = findViewById(R.id.checkBoxCaerma);
-        checkBoxCaerma.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        checkBoxCaerma.setOnCheckedChangeListener((buttonView, isChecked) -> {
 //                mOpenCvCameraView.setUseFrontCamera(isChecked);
-                mOpenCvCameraView.setCameraIndex(isChecked ? 1 : 0);
-                initCamera();
-            }
+            mOpenCvCameraView.setCameraIndex(isChecked ? 1 : 0);
+            initCamera();
         });
 
         mOpenCvCameraView = findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
-
         mOpenCvCameraView.setCvCameraViewListener(this);
 
         cardTypes.add("梅花");
         cardTypes.add("红桃");
         cardTypes.add("方块");
         cardTypes.add("黑桃");
-
-
     }
 
     @Override
@@ -168,9 +122,7 @@ public class PokerRecActivity extends Activity implements CameraBridgeViewBase.C
             Log.d(TAG, "OpenCV library found inside package. Using it!");
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
-
     }
-
 
     public void onDestroy() {
         super.onDestroy();

@@ -1,5 +1,7 @@
 package com.myopencvdemo;
 
+import static org.opencv.core.CvType.CV_8UC1;
+
 import android.app.Activity;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -9,12 +11,29 @@ import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.*;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
+
 import com.myopencvdemo.datapool.DataPool;
 import com.myopencvdemo.domain.MlData;
 import com.myopencvdemo.domain.RecResult;
-import org.opencv.android.*;
-import org.opencv.core.*;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.JavaCameraView;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfFloat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
@@ -24,10 +43,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import static org.opencv.core.CvType.CV_8UC1;
-
 /**
- *
  * 教学版本
  */
 public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -96,59 +112,42 @@ public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeVie
 
         imageViewRightTarget = findViewById(R.id.imageViewRightTarget);
         viewContent = findViewById(R.id.viewContent);
-        viewContent.post(new Runnable() {
-            @Override
-            public void run() {
-                cropContentPercent = (((LinearLayout.LayoutParams) viewContent.getLayoutParams()).weight);
-                coverContentPercennt = (((LinearLayout.LayoutParams) findViewById(R.id.converView).getLayoutParams()).weight);
-                Log.e(App.tag, "weight is :" + cropContentPercent + " cover:" + coverContentPercennt * 2);
-
-            }
+        viewContent.post(() -> {
+            cropContentPercent = (((LinearLayout.LayoutParams) viewContent.getLayoutParams()).weight);
+            coverContentPercennt = (((LinearLayout.LayoutParams) findViewById(R.id.converView).getLayoutParams()).weight);
+            Log.d(App.tag, "weight is :" + cropContentPercent + " cover:" + coverContentPercennt * 2);
         });
 
-
         textViewResult = findViewById(R.id.textViewResult);
-        textViewResult.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                needRec = true;
-                textViewResult.setText("等待重新识别:");
-            }
+        textViewResult.setOnClickListener(v -> {
+            needRec = true;
+            textViewResult.setText("等待重新识别:");
         });
 
         rects = new ArrayList<>();
-
         checkBoxStudy = findViewById(R.id.checkBoxStudy);
 
         Resources resources = this.getResources();
         DisplayMetrics dm = resources.getDisplayMetrics();
-        float density = dm.density;
         screen_width = dm.widthPixels;
         screen_height = dm.heightPixels;
 
-
         seekBar = findViewById(R.id.seekBar);
         checkBoxCaerma = findViewById(R.id.checkBoxCaerma);
-        checkBoxCaerma.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-//                mOpenCvCameraView.setUseFrontCamera(isChecked);
-                mOpenCvCameraView.setCameraIndex(isChecked ? 1 : 0);
-                initCamera();
-            }
+        checkBoxCaerma.setOnCheckedChangeListener((buttonView, isChecked) -> {
+//            mOpenCvCameraView.setUseFrontCamera(isChecked);
+            mOpenCvCameraView.setCameraIndex(isChecked ? 1 : 0);
+            initCamera();
         });
 
         mOpenCvCameraView = findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
-
         mOpenCvCameraView.setCvCameraViewListener(this);
 
         cardTypes.add("梅花");
         cardTypes.add("红桃");
         cardTypes.add("方块");
         cardTypes.add("黑桃");
-
-
     }
 
     @Override
@@ -172,9 +171,7 @@ public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeVie
             Log.d(TAG, "OpenCV library found inside package. Using it!");
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
-
     }
-
 
     public void onDestroy() {
         super.onDestroy();
@@ -196,56 +193,36 @@ public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeVie
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-
         try {
-
             targetAreas.clear();
             rects.clear();
 
             Mat gray = inputFrame.rgba();//可能出现这个错误:(-215:Assertion failed) u != 0 in function 'void cv::Mat::create(int, const int*, int)'
             Mat srcMat = gray.clone();
-
             int twidth = srcMat.width();
             int theight = srcMat.height();
-
-//          Log.e(App.tag, "target wh:" + twidth + "," + theight);
-
             Rect targetCropRect = new Rect();
-
             targetCropRect.width = twidth;
             int targetHeight = (int) (theight * (cropContentPercent * 1.0 / (cropContentPercent + coverContentPercennt * 2)));
             targetCropRect.height = targetHeight;
-
-//            Log.e(App.tag, "target screen_width*screen_height:" + targetCropRect.width + "," + targetCropRect.height);
-
             targetCropRect.x = 0;
             targetCropRect.y = theight / 2 - targetCropRect.height / 2;
-
             Mat targetMat = new Mat(srcMat, targetCropRect);
-
             Mat copyMat = targetMat.clone();
-
-
             Imgproc.cvtColor(targetMat, targetMat, Imgproc.COLOR_RGBA2GRAY);
             Mat dst = new Mat(gray.rows(), gray.cols(), CV_8UC1);
             int bValue = seekBar.getProgress();
             Imgproc.threshold(targetMat, dst, bValue, 255, Imgproc.THRESH_BINARY);
-
             List<MatOfPoint> contours = new ArrayList<>();
-            Imgproc.findContours(dst, contours, new Mat(dst.rows(), dst.cols(), dst.type()), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);//CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE
-
-
-
+            // CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE
+            Imgproc.findContours(dst, contours, new Mat(dst.rows(), dst.cols(), dst.type()), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
             ArrayList<RecResult> predicateds = new ArrayList<>();
-
             for (int i = 0, isize = contours.size(); i < isize; i++) {
                 MatOfPoint temp = contours.get(i);
                 Rect rect = Imgproc.boundingRect(temp);
-
                 float wh = (rect.width * 1.0f / rect.height);
                 boolean test = false;
-
-                if ((test) || (rect.height > (targetHeight*1.0f / 5)) && (rect.height < 0.8f * targetHeight) && (rect.width < (targetMat.width() / 8)) && (wh < 2)) {
+                if ((test) || (rect.height > (targetHeight * 1.0f / 5)) && (rect.height < 0.8f * targetHeight) && (rect.width < (targetMat.width() / 8)) && (wh < 2)) {
 //                   Log.e(App.tag, "------>>>rhfactor:" + wh + " startX:" + rect.x);
                     Imgproc.rectangle(copyMat, rect.tl(), rect.br(), new Scalar(0, 0, 255, 255), 2);
                     targetAreas.add(temp);
@@ -315,16 +292,11 @@ public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeVie
                 }
             }
 
-            Collections.sort(predicateds, new Comparator<RecResult>() {
-
-                @Override
-                public int compare(RecResult o1, RecResult o2) {
-
-                    if (o1.getStartX() <= o2.getStartX()) {
-                        return -1;
-                    } else {
-                        return 1;
-                    }
+            Collections.sort(predicateds, (o1, o2) -> {
+                if (o1.getStartX() <= o2.getStartX()) {
+                    return -1;
+                } else {
+                    return 1;
                 }
             });
 
@@ -341,8 +313,6 @@ public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeVie
                 }
             }
             if (huase.size() == huseCount) {//识别出指定数量的卡片数量
-
-
                 ArrayList<Poker> pokers = new ArrayList<>();//存放识别结果
 
                 StringBuffer sbfCardNo = new StringBuffer();
