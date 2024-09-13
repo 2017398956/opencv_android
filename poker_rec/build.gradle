@@ -22,15 +22,15 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
 
-        sourceSets {
-            main {
-                jni.srcDirs = []
-                jniLibs.srcDir 'src/main/libs'
-            }
-        }
+//        sourceSets {
+//            main {
+//                jni.srcDirs = []
+//                jniLibs.srcDir 'src/main/libs'
+//            }
+//        }
     }
 
-
+    namespace("com.myopencvdemo")
 }
 
 dependencies {

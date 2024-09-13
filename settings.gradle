@@ -1,2 +1,9 @@
-include ':face_dect', ':face_dect_max_face',':opencv', ':camera_control', ':calibration', ':camera_preview', ':poker_rec',":camera_preview90"
+//include ':face_dect'
+//include ':face_dect_max_face'
+include ':opencv'
+//include ':camera_control'
+//include ':calibration'
+//include ':camera_preview'
+include ':poker_rec'
+//include ":camera_preview90"
 

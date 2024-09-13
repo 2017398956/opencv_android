@@ -5,24 +5,16 @@
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
         <option name="delegatedBuild" value="false" />
-        <option name="testRunner" value="PLATFORM" />
-        <option name="distributionType" value="DEFAULT_WRAPPED" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="gradleJvm" value="#GRADLE_LOCAL_JAVA_HOME" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/calibration" />
-            <option value="$PROJECT_DIR$/camera_control" />
-            <option value="$PROJECT_DIR$/camera_preview" />
-            <option value="$PROJECT_DIR$/camera_preview90" />
-            <option value="$PROJECT_DIR$/face_dect" />
-            <option value="$PROJECT_DIR$/face_dect_max_face" />
             <option value="$PROJECT_DIR$/opencv" />
             <option value="$PROJECT_DIR$/poker_rec" />
           </set>
         </option>
-        <option name="resolveModulePerSourceSet" value="false" />
-        <option name="useQualifiedModuleNames" value="true" />
+        <option name="resolveExternalAnnotations" value="false" />
       </GradleProjectSettings>
     </option>
   </component>
