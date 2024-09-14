@@ -1,5 +1,6 @@
 package com.myopencvdemo.domain;
 
+import android.support.annotation.NonNull;
 import android.util.Log;
 import com.myopencvdemo.App;
 import com.myopencvdemo.datapool.DataPool;
@@ -13,13 +14,19 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * 一种类型的特征值数据，包括一系列的特征文件
+ */
 public class MlData {
 
-    public static final int UNITWIDTH = 40, UNITHEIGHT = 60;
+    public static final int UNIT_WIDTH = 40, UNIT_HEIGHT = 60;
 
+    /**
+     * 当前特质类型文件的存放目录文件夹名称
+     */
     public String label;
-    public HashMap<File, MatOfFloat> datas;
 
+    public HashMap<File, MatOfFloat> datas;
     public ArrayList<MatOfFloat> listDatas;
 
     public MlData(String label) {
@@ -37,7 +44,6 @@ public class MlData {
         return this.listDatas;
     }
 
-
     public String getLabel() {
         return label;
     }
@@ -51,15 +57,11 @@ public class MlData {
     }
 
     public static MlData createMlDataFromDirectory(File dir) {
-
         MlData mlData = new MlData(dir.getName());
-
-        if (null != dir && dir.exists() && dir.isDirectory()) {
-            File[] stdfiles = dir.listFiles();
-            for (int i = 0, isize = stdfiles.length; i < isize; i++) {
-                File df = stdfiles[i];
-
-                if (null != df && df.exists() && (df.getAbsolutePath().endsWith(".png") || df.getAbsolutePath().endsWith(".PNG"))) {
+        if (dir.exists() && dir.isDirectory()) {
+            File[] stdFiles = dir.listFiles();
+            for (File df : stdFiles) {
+                if (null != df && df.exists() && df.getAbsolutePath().toUpperCase().endsWith(".PNG")) {
                     MatOfFloat matOfFloat = createMlDataFromFile(df);
                     if (null != matOfFloat) {
                         mlData.putMlData(df, matOfFloat);
@@ -73,20 +75,16 @@ public class MlData {
         return mlData;
     }
 
-
     private static MatOfFloat createMlDataFromFile(File file) {
-
         try {
-
             Mat mat = Imgcodecs.imread(file.getAbsolutePath());
-            Mat dstMat = new Mat(UNITWIDTH, UNITHEIGHT, mat.type());
-            Imgproc.resize(mat, dstMat, new Size(UNITWIDTH, UNITHEIGHT));
+            Mat dstMat = new Mat(UNIT_WIDTH, UNIT_HEIGHT, mat.type());
+            Imgproc.resize(mat, dstMat, new Size(UNIT_WIDTH, UNIT_HEIGHT));
 
             MatOfFloat descriptors = new MatOfFloat();
             DataPool.getHogDescriptor().compute(dstMat, descriptors);
 //          List<Float> list = descriptors.toList();
 //          Log.i(App.tag, "create vector:" + file.getAbsolutePath());
-
             return descriptors;
         } catch (Exception e) {
             e.printStackTrace();
@@ -94,7 +92,7 @@ public class MlData {
         return null;
     }
 
-
+    @NonNull
     @Override
     public String toString() {
         return "label:"+label+" datasize:"+datas.size();

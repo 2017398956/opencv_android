@@ -12,7 +12,6 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.CheckBox;
-import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -40,7 +39,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -255,8 +253,8 @@ public class PokerRecJiaoXueActivity extends Activity implements CameraBridgeVie
                         if (needRec) {
                             //识别模式
                             Mat matArea = new Mat(dst, rect);
-                            Mat dstMat = new Mat(MlData.UNITWIDTH, MlData.UNITHEIGHT, matArea.type());
-                            Imgproc.resize(matArea, dstMat, new Size(MlData.UNITWIDTH, MlData.UNITHEIGHT));//归一化
+                            Mat dstMat = new Mat(MlData.UNIT_WIDTH, MlData.UNIT_HEIGHT, matArea.type());
+                            Imgproc.resize(matArea, dstMat, new Size(MlData.UNIT_WIDTH, MlData.UNIT_HEIGHT));//归一化
 
                             MatOfFloat matf = new MatOfFloat();//计算特征
                             DataPool.getHogDescriptor().compute(dstMat, matf);
