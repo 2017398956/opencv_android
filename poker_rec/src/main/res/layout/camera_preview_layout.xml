@@ -9,7 +9,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-        <org.opencv.android.JavaCameraView
+        <com.myopencvdemo.views.MyJavaCameraView
                 android:id="@+id/tutorial1_activity_java_surface_view"
                 android:layout_width="fill_parent"
                 android:layout_height="fill_parent"
@@ -29,13 +29,15 @@
                     android:layout_weight="4"
                     android:background="#88000000" />
 
-            <LinearLayout
+            <View
                     android:id="@+id/viewContent"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1.1"
                     android:background="@drawable/shape_bg_line"
-                    android:orientation="horizontal" />
+                    android:orientation="horizontal"
+                    android:visibility="invisible"
+                    tools:visibility="visible" />
 
             <View
                     android:layout_width="match_parent"

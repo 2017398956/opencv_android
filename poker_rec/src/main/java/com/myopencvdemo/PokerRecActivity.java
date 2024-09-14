@@ -1,5 +1,7 @@
 package com.myopencvdemo;
 
+import static org.opencv.core.CvType.CV_8UC1;
+
 import android.app.Activity;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -10,24 +12,35 @@ import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.*;
+import android.widget.CheckBox;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
 
 import com.myopencvdemo.datapool.DataPool;
 import com.myopencvdemo.domain.MlData;
 import com.myopencvdemo.domain.RecResult;
+import com.myopencvdemo.views.MyJavaCameraView;
 
-import org.opencv.android.*;
-import org.opencv.core.*;
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfFloat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-
-import static org.opencv.core.CvType.CV_8UC1;
 
 public class PokerRecActivity extends Activity {
     private static final String TAG = "cv";
@@ -54,6 +67,14 @@ public class PokerRecActivity extends Activity {
                 Mat srcMat = gray.clone();
                 int twidth = srcMat.width();
                 int theight = srcMat.height();
+                if (!justViewContent) {
+                    LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) viewContent.getLayoutParams();
+                    layoutParams.leftMargin = (int) (viewContent.getWidth() - twidth * mOpenCvCameraView.getBitmapScale()) / 2;
+                    layoutParams.rightMargin = layoutParams.leftMargin;
+                    viewContent.setLayoutParams(layoutParams);
+                    viewContent.setVisibility(View.VISIBLE);
+                    justViewContent = true;
+                }
 //                Log.e(App.tag, "target wh:" + twidth + "," + theight);
                 // 识别区域
                 Rect targetCropRect = new Rect();
@@ -169,51 +190,58 @@ public class PokerRecActivity extends Activity {
                         cardNo.add(card);
                     }
                 }
-                ArrayList<Poker> pokers = new ArrayList<>();//存放识别结果
-                StringBuffer sbfCardNo = new StringBuffer();
-                // 正确的处理 10 的识别结果，如果只出现了 1 或者 0，识别结果都是不对的
-                for (int i = 0; i < cardNo.size(); i++) {
-                    if ("1".equalsIgnoreCase(cardNo.get(i).getResultLabel())) {
-                        if ((i + 1) < cardNo.size()) {
-                            String nextZero = cardNo.get(i + 1).getResultLabel();
-                            if ("0".equalsIgnoreCase(nextZero)) {
-                                // 1 和 0 不能分开，而且只有 '10' 这种情况
-                                sbfCardNo.append(cardNo.get(i).getResultLabel()).append(cardNo.get(i + 1).getResultLabel()).append(",");
-                                i++;
+                /**
+                 * FIXME:先简单根据花色和数字长度判断是否是正确结果
+                 */
+                if (huase.size() == cardNo.size()) {
+                    ArrayList<Poker> pokers = new ArrayList<>();//存放识别结果
+                    StringBuffer sbfCardNo = new StringBuffer();
+                    // 正确的处理 10 的识别结果，如果只出现了 1 或者 0，识别结果都是不对的
+                    for (int i = 0; i < cardNo.size(); i++) {
+                        if ("1".equalsIgnoreCase(cardNo.get(i).getResultLabel())) {
+                            if ((i + 1) < cardNo.size()) {
+                                String nextZero = cardNo.get(i + 1).getResultLabel();
+                                if ("0".equalsIgnoreCase(nextZero)) {
+                                    // 1 和 0 不能分开，而且只有 '10' 这种情况
+                                    sbfCardNo.append(cardNo.get(i).getResultLabel()).append(cardNo.get(i + 1).getResultLabel()).append(",");
+                                    i++;
+                                } else {
+                                    Log.e(App.tag, "识别 1 但是紧接着不是0【识别失败】");
+                                    break;
+                                }
                             } else {
-                                Log.e(App.tag, "识别 1 但是紧接着不是0【识别失败】");
+                                Log.e(App.tag, "识别到最后一个数字是1本次【识别失败】");
                                 break;
                             }
                         } else {
-                            Log.e(App.tag, "识别到最后一个数字是1本次【识别失败】");
-                            break;
+                            sbfCardNo.append(cardNo.get(i).getResultLabel()).append(",");
                         }
-                    } else {
-                        sbfCardNo.append(cardNo.get(i).getResultLabel()).append(",");
                     }
-                }
 
-                String[] cards = sbfCardNo.toString().split(",");
-                ArrayList<String> rightCardNo = new ArrayList<>();
-                for (String card : cards) {
-                    if (!"0".equals(card) && !"1".equals(card)) {
-                        // 如果识别结果单独出现了1，或者 0 是不对的
-                        rightCardNo.add(card);
+                    String[] cards = sbfCardNo.toString().split(",");
+                    ArrayList<String> rightCardNo = new ArrayList<>();
+                    for (String card : cards) {
+                        if (!"0".equals(card) && !"1".equals(card)) {
+                            // 如果识别结果单独出现了1，或者 0 是不对的
+                            rightCardNo.add(card);
+                        }
+                    }
+                    // 经过处理后，如果和花色的数量是一样的，就算识别正确了
+                    // 筛选出正确的识别结果，到这里为止，算是识别成功
+                    if (rightCardNo.size() <= huase.size()) {
+                        Log.e(App.tag, "----------------------------Nice-------------------");
+                        final StringBuffer stringBuffer = new StringBuffer();
+                        for (int i = 0; i < rightCardNo.size(); i++) {
+                            Poker poker = new Poker(huase.get(i).getResultLabel(), rightCardNo.get(i));
+                            pokers.add(poker);
+                            stringBuffer.append(poker);
+                        }
+                        Log.e(App.tag, "识别结果:" + stringBuffer);
+                        Log.e(App.tag, "----------------------------Nice End-------------------");
+                        runOnUiThread(() -> textViewResult.setText("识别结果:" + stringBuffer.toString() + "点击重新识别"));
+                        needRec = false;
                     }
                 }
-                // 经过处理后，如果和花色的数量是一样的，就算识别正确了
-                // 筛选出正确的识别结果，到这里为止，算是识别成功
-                Log.e(App.tag, "----------------------------Nice-------------------");
-                final StringBuffer stringBuffer = new StringBuffer();
-                for (int i = 0; i < rightCardNo.size(); i++) {
-                    Poker poker = new Poker(huase.get(i).getResultLabel(), rightCardNo.get(i));
-                    pokers.add(poker);
-                    stringBuffer.append(poker);
-                }
-                Log.e(App.tag, "识别结果:" + stringBuffer);
-                Log.e(App.tag, "----------------------------Nice End-------------------");
-                runOnUiThread(() -> textViewResult.setText("识别结果:" + stringBuffer.toString() + "点击重新识别"));
-                needRec = false;
                 // 展示识别到的区域
                 bitmap = Bitmap.createBitmap(targetCropRect.width, targetCropRect.height, Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(copyMat, bitmap);
@@ -221,16 +249,18 @@ public class PokerRecActivity extends Activity {
                 targetMat.release();
                 return gray;
             } catch (Exception e) {
+                e.printStackTrace();
                 Log.e(App.tag, "error onpreview:" + e.getLocalizedMessage());
             }
             return null;
         }
     };
-    private JavaCameraView mOpenCvCameraView;
+    private MyJavaCameraView mOpenCvCameraView;
     private SeekBar seekBar;
     private CheckBox checkBoxCaerma;
     private CheckBox checkBoxStudy;
     private View viewContent;
+    private boolean justViewContent;
     private ArrayList<String> cardTypes = new ArrayList<>();
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
