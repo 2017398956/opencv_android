@@ -1,9 +1,9 @@
 apply plugin: 'com.android.application'
+apply plugin: 'AspectPlugin'
+apply plugin: 'abcpermission.plugin'
 
 android {
     compileSdkVersion 28
-
-
 
     defaultConfig {
         applicationId "com.myopencvdemo"
@@ -36,6 +36,7 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'org.aspectj:aspectjrt:1.9.6'
     implementation 'com.android.support.constraint:constraint-layout:1.1.3'
 
     implementation 'com.github.f0ris.sweetalert:library:1.5.1'

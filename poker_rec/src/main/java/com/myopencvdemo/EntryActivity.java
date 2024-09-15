@@ -1,5 +1,6 @@
 package com.myopencvdemo;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -25,6 +26,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
+import personal.nfl.permission.annotation.GetPermissions4AndroidX;
+import personal.nfl.permission.annotation.GetPermissionsAuto;
 
 /**
  * 入口Activity
@@ -76,7 +79,11 @@ public class EntryActivity extends AppCompatActivity {
         setContentView(R.layout.main);
         textViewStatus = findViewById(R.id.textViewStatus);
         findViewById(R.id.buttonPreview).setOnClickListener(v -> startActivity(new Intent(this, PokerRecJiaoXueActivity.class)));
-        findViewById(R.id.createMlData).setOnClickListener(v -> new MlThread(mlDataPath).start());
+        findViewById(R.id.createMlData).setOnClickListener(v -> {
+            if (requestWriteExternalStoragePermission() == null) {
+                new MlThread(mlDataPath).start();
+            }
+        });
         if (!OpenCVLoader.initDebug()) {
             Log.d(App.tag, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
             OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this.getApplicationContext(), mLoaderCallback);
@@ -134,12 +141,19 @@ public class EntryActivity extends AppCompatActivity {
         }
     }
 
+
+    @GetPermissionsAuto({Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA})
+    private Object requestWriteExternalStoragePermission() {
+        return null;
+    }
+
     /**
      * 复制asset文件到指定目录
      *
      * @param oldPath asset下的路径
      * @param newPath SD卡下保存路径
      */
+
     public static void copyAssets(Context context, String oldPath, String newPath) {
         try {
             // 获取assets目录下的所有文件及目录名

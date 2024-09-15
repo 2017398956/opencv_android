@@ -57,39 +57,45 @@ public class PokerRecActivity extends Activity {
 
         }
 
+        private int srcImgWidth;
+        private int srcImgHeight;
+        private Rect targetCropRect;
+        private Bitmap bitmap = null;
         @Override
         public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
             try {
                 targetAreas.clear();
                 rects.clear();
                 // 可能出现这个错误:(-215:Assertion failed) u != 0 in function 'void cv::Mat::create(int, const int*, int)'
-                Mat gray = inputFrame.rgba();
-                Mat srcMat = gray.clone();
-                int twidth = srcMat.width();
-                int theight = srcMat.height();
+                Mat srcRGBAMat = inputFrame.rgba();
+                Mat srcMat = srcRGBAMat.clone();
+                // FIXME:理论上相机开启后其尺寸参数已经确定，所拍摄图片的宽高不会变
                 if (!justViewContent) {
-                    LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) viewContent.getLayoutParams();
-                    layoutParams.leftMargin = (int) (viewContent.getWidth() - twidth * mOpenCvCameraView.getBitmapScale()) / 2;
-                    layoutParams.rightMargin = layoutParams.leftMargin;
-                    viewContent.setLayoutParams(layoutParams);
-                    viewContent.setVisibility(View.VISIBLE);
                     justViewContent = true;
+                    srcImgWidth = srcMat.width();
+                    srcImgHeight = srcMat.height();
+                    // 获取识别区域，注意：这里是在原图上的区域，而通过相机在屏幕上看到的，是经过缩放的
+                    targetCropRect = new Rect();
+                    targetCropRect.width = srcImgWidth;
+                    targetCropRect.height = (int) (srcImgHeight * (cropContentPercent / (cropContentPercent + coverContentPercent * 2)));
+                    targetCropRect.x = 0;
+                    targetCropRect.y = srcImgHeight / 2 - targetCropRect.height / 2;
+                    // 调整 UI
+                    runOnUiThread(() -> {
+                        LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) viewContent.getLayoutParams();
+                        layoutParams.leftMargin = (int) (viewContent.getWidth() - srcImgWidth * mOpenCvCameraView.getBitmapScale()) / 2;
+                        layoutParams.rightMargin = layoutParams.leftMargin;
+                        viewContent.setLayoutParams(layoutParams);
+                        viewContent.setVisibility(View.VISIBLE);
+                    });
+                    Log.d(App.tag, "viewContent width:" + viewContent.getWidth() + " srcImgWidth:" + srcImgWidth + " srcImgHeight:" + srcImgHeight + " scale:" + mOpenCvCameraView.getBitmapScale());
                 }
-//                Log.e(App.tag, "target wh:" + twidth + "," + theight);
-                // 识别区域
-                Rect targetCropRect = new Rect();
-                targetCropRect.width = twidth;
-                int targetHeight = (int) (theight * (cropContentPercent * 1.0 / (cropContentPercent + coverContentPercennt * 2)));
-                targetCropRect.height = targetHeight;
-//            Log.e(App.tag, "target screen_width*screen_height:" + targetCropRect.width + "," + targetCropRect.height);
-                targetCropRect.x = 0;
-                targetCropRect.y = theight / 2 - targetCropRect.height / 2;
                 // 获取识别区域的内容
                 Mat targetMat = new Mat(srcMat, targetCropRect);
-                Mat copyMat = targetMat.clone();
+                Mat predicateMat = targetMat.clone();
                 // 灰度处理
                 Imgproc.cvtColor(targetMat, targetMat, Imgproc.COLOR_RGBA2GRAY);
-                Mat dst = new Mat(gray.rows(), gray.cols(), CV_8UC1);
+                Mat dst = new Mat(srcRGBAMat.rows(), srcRGBAMat.cols(), CV_8UC1);
                 int bValue = seekBar.getProgress();
                 // 二值化
                 Imgproc.threshold(targetMat, dst, bValue, seekBar.getMax(), Imgproc.THRESH_BINARY);
@@ -105,13 +111,12 @@ public class PokerRecActivity extends Activity {
                     // 使用 boundingRect 方法联通区域变成矩形区域
                     Rect rect = Imgproc.boundingRect(temp);
                     float wh = (rect.width * 1.0f / rect.height);//宽高比例
-                    boolean test = false;
-                    if ((test)
-                            || (rect.height > (targetHeight * 1.0f / 5))
-                            && (rect.height < 0.8f * targetHeight)
-                            && (rect.width < (targetMat.width() / 8)) && (wh < 2)) {
-//                   Log.e(App.tag, "------>>>rhfactor:" + wh + " startX:" + rect.x);
-                        Imgproc.rectangle(copyMat, rect.tl(), rect.br(), new Scalar(0, 0, 255, 255), 2);
+                    // 这里的判断条件是根据正常情况下的估计值
+                    if ((rect.height > (targetCropRect.height * 1.0f / 5))
+                            && (rect.height < 0.8f * targetCropRect.height)
+                            && (rect.width < (targetCropRect.width / 8)) && (wh < 2)) {
+                        // 构建识别结果区域（用蓝色方框展示）
+                        Imgproc.rectangle(predicateMat, rect.tl(), rect.br(), new Scalar(0, 0, 255, 255), 2);
                         targetAreas.add(temp);
                         rects.add(rect);
                         if (checkBoxStudy.isChecked()) {
@@ -144,15 +149,13 @@ public class PokerRecActivity extends Activity {
                                 // 归一化，把所有的图片大小调整成一样大，得到的特征值才会是一样的
                                 Imgproc.resize(matArea, dstMat, new Size(MlData.UNIT_WIDTH, MlData.UNIT_HEIGHT));
                                 MatOfFloat matf = new MatOfFloat();
-                                DataPool.getHogDescriptor().compute(dstMat, matf);//计算特征
-//                        Log.e(App.tag, "matf row:" + matf.rows());
-                                Mat nmatf = matf.reshape(0, 1);//修改特征值的为1行N列
+                                // 计算特征
+                                DataPool.getHogDescriptor().compute(dstMat, matf);
+                                // 修改特征值的为 1行 N 列
+                                Mat nmatf = matf.reshape(0, 1);
                                 Mat result = new Mat();
-//                          Log.e(App.tag, "test col:" + nmatf.cols());
-                                // 预测结果,这里的预测结果是一个数字，这个数字代表一个样本文件详情见初始化学习书序代码
+                                // 预测结果,这里的预测结果是一个数字，这个数字代表一个样本文件详情见初始化学习书序代
                                 float response = DataPool.getkNearest().predict(nmatf, result);
-//                          Log.e(App.tag, "percent:" + DataPool.getPredicatedResult(response) + " predicated:" + nmatf.toString());
-                                String resultStr = result.toString();
                                 // 把数字转换成对应的文件,比如 /sdcard/0/0.png
                                 String resultLabel = DataPool.getPredicatedResult(response);
                                 File file = new File(resultLabel);
@@ -171,7 +174,7 @@ public class PokerRecActivity extends Activity {
                         }
                     }
                 }
-
+                // 按照 x 坐标排序
                 Collections.sort(predicateds, (o1, o2) -> {
                     if (o1.getStartX() <= o2.getStartX()) {
                         return -1;
@@ -190,64 +193,62 @@ public class PokerRecActivity extends Activity {
                         cardNo.add(card);
                     }
                 }
-                /**
-                 * FIXME:先简单根据花色和数字长度判断是否是正确结果
-                 */
-                if (huase.size() == cardNo.size()) {
-                    ArrayList<Poker> pokers = new ArrayList<>();//存放识别结果
-                    StringBuffer sbfCardNo = new StringBuffer();
-                    // 正确的处理 10 的识别结果，如果只出现了 1 或者 0，识别结果都是不对的
-                    for (int i = 0; i < cardNo.size(); i++) {
-                        if ("1".equalsIgnoreCase(cardNo.get(i).getResultLabel())) {
-                            if ((i + 1) < cardNo.size()) {
-                                String nextZero = cardNo.get(i + 1).getResultLabel();
-                                if ("0".equalsIgnoreCase(nextZero)) {
-                                    // 1 和 0 不能分开，而且只有 '10' 这种情况
-                                    sbfCardNo.append(cardNo.get(i).getResultLabel()).append(cardNo.get(i + 1).getResultLabel()).append(",");
-                                    i++;
-                                } else {
-                                    Log.e(App.tag, "识别 1 但是紧接着不是0【识别失败】");
-                                    break;
-                                }
+                // 处理牌的大小
+                StringBuffer sbfCardNo = new StringBuffer();
+                // 正确的处理 10 的识别结果，如果只出现了 1 或者 0，识别结果都是不对的
+                for (int i = 0; i < cardNo.size(); i++) {
+                    if ("1".equalsIgnoreCase(cardNo.get(i).getResultLabel())) {
+                        if ((i + 1) < cardNo.size()) {
+                            String nextZero = cardNo.get(i + 1).getResultLabel();
+                            if ("0".equalsIgnoreCase(nextZero)) {
+                                // 1 和 0 不能分开，而且只有 '10' 这种情况
+                                sbfCardNo.append(cardNo.get(i).getResultLabel()).append(cardNo.get(i + 1).getResultLabel()).append(",");
+                                i++;
                             } else {
-                                Log.e(App.tag, "识别到最后一个数字是1本次【识别失败】");
+                                Log.e(App.tag, "识别 1 但是紧接着不是0【识别失败】");
                                 break;
                             }
                         } else {
-                            sbfCardNo.append(cardNo.get(i).getResultLabel()).append(",");
+                            Log.e(App.tag, "识别到最后一个数字是1本次【识别失败】");
+                            break;
                         }
-                    }
-
-                    String[] cards = sbfCardNo.toString().split(",");
-                    ArrayList<String> rightCardNo = new ArrayList<>();
-                    for (String card : cards) {
-                        if (!"0".equals(card) && !"1".equals(card)) {
-                            // 如果识别结果单独出现了1，或者 0 是不对的
-                            rightCardNo.add(card);
-                        }
-                    }
-                    // 经过处理后，如果和花色的数量是一样的，就算识别正确了
-                    // 筛选出正确的识别结果，到这里为止，算是识别成功
-                    if (rightCardNo.size() <= huase.size()) {
-                        Log.e(App.tag, "----------------------------Nice-------------------");
-                        final StringBuffer stringBuffer = new StringBuffer();
-                        for (int i = 0; i < rightCardNo.size(); i++) {
-                            Poker poker = new Poker(huase.get(i).getResultLabel(), rightCardNo.get(i));
-                            pokers.add(poker);
-                            stringBuffer.append(poker);
-                        }
-                        Log.e(App.tag, "识别结果:" + stringBuffer);
-                        Log.e(App.tag, "----------------------------Nice End-------------------");
-                        runOnUiThread(() -> textViewResult.setText("识别结果:" + stringBuffer.toString() + "点击重新识别"));
-                        needRec = false;
+                    } else {
+                        sbfCardNo.append(cardNo.get(i).getResultLabel()).append(",");
                     }
                 }
-                // 展示识别到的区域
+                String[] cards = sbfCardNo.toString().split(",");
+                ArrayList<String> rightCardNo = new ArrayList<>();
+                for (String card : cards) {
+                    if (!"0".equals(card) && !"1".equals(card)) {
+                        // 如果识别结果单独出现了1，或者 0 是不对的
+                        rightCardNo.add(card);
+                    }
+                }
+                /**
+                 * FIXME:先简单根据花色和数字长度判断是否是正确结果
+                 */
+                // 经过处理后，如果和花色的数量是一样的，就算识别正确了
+                if (huase.size() == rightCardNo.size()) {
+                    ArrayList<Poker> pokers = new ArrayList<>();//存放识别结果
+                    Log.e(App.tag, "----------------------------Nice-------------------");
+                    final StringBuffer stringBuffer = new StringBuffer();
+                    for (int i = 0; i < rightCardNo.size(); i++) {
+                        Poker poker = new Poker(huase.get(i).getResultLabel(), rightCardNo.get(i));
+                        pokers.add(poker);
+                        stringBuffer.append(poker);
+                    }
+                    Log.e(App.tag, "识别结果:" + stringBuffer);
+                    Log.e(App.tag, "----------------------------Nice End-------------------");
+                    runOnUiThread(() -> textViewResult.setText("识别结果:" + stringBuffer.toString() + "点击重新识别"));
+                    needRec = false;
+                }
+                // 创建识别到的区域图像
                 bitmap = Bitmap.createBitmap(targetCropRect.width, targetCropRect.height, Bitmap.Config.ARGB_8888);
-                Utils.matToBitmap(copyMat, bitmap);
+                Utils.matToBitmap(predicateMat, bitmap);
+                // 展示识别区域
                 runOnUiThread(() -> imageViewRightTarget.setImageBitmap(bitmap));
                 targetMat.release();
-                return gray;
+                return srcRGBAMat;
             } catch (Exception e) {
                 e.printStackTrace();
                 Log.e(App.tag, "error onpreview:" + e.getLocalizedMessage());
@@ -276,8 +277,10 @@ public class PokerRecActivity extends Activity {
     int screen_width;
     int screen_height;
     ArrayList<Rect> rects;
-    Bitmap bitmap = null;
     ImageView imageViewRightTarget;
+    /**
+     * 是否需要识别，当识别成功后置为 false，用户点击重新识别后再置为 true
+     */
     private boolean needRec = true;
     private TextView textViewResult;
     /**
@@ -287,7 +290,7 @@ public class PokerRecActivity extends Activity {
     /**
      * 上半部分高度在图片上占的比重
      */
-    private float coverContentPercennt = 1;
+    private float coverContentPercent = 1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -299,8 +302,8 @@ public class PokerRecActivity extends Activity {
         viewContent = findViewById(R.id.viewContent);
         viewContent.post(() -> {
             cropContentPercent = (((LinearLayout.LayoutParams) viewContent.getLayoutParams()).weight);
-            coverContentPercennt = (((LinearLayout.LayoutParams) findViewById(R.id.converView).getLayoutParams()).weight);
-            Log.d(App.tag, "weight is :" + cropContentPercent + " cover:" + coverContentPercennt * 2);
+            coverContentPercent = (((LinearLayout.LayoutParams) findViewById(R.id.converView).getLayoutParams()).weight);
+            Log.d(App.tag, "weight is :" + cropContentPercent + " cover:" + coverContentPercent * 2);
         });
         textViewResult = findViewById(R.id.textViewResult);
         textViewResult.setOnClickListener(v -> {
